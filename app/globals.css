@@ -1,49 +1,319 @@
+/* =========================================================================
+   Neurograma
+   Dirección: microscopía de campo oscuro. El tejido brilla sobre un índigo
+   profundo, como una preparación iluminada de lado. Varios acentos cálidos
+   —coral, ámbar, cian, violeta— en vez de un único verde ácido: cada región
+   tiene su tono y el ojo aprende a distinguirlas.
+   ========================================================================= */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --fondo: #0a0e1a;
+  --tejido: #161d33;
+  --tejido-alto: #1e2745;
+  --linea: #2c3757;
+  --tinta: #e6e9f0;
+  --tinta-suave: #8892ad;
+
+  --coral: #ff6b6b;
+  --ambar: #ffb35c;
+  --cian: #4ecdc4;
+  --violeta: #a78bfa;
+
+  --medida: min(1280px, 92vw);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-html {
-  height: 100%;
-}
-
-html,
 body {
-  max-width: 100vw;
+  margin: 0;
+  background: var(--fondo);
+  color: var(--tinta);
+  font-family: var(--f-cuerpo), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
-body {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Halo de iluminación: la luz oblicua del campo oscuro. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 70% 55% at 50% 42%,
+    rgba(78, 205, 196, 0.07),
+    transparent 70%
+  );
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+main {
+  position: relative;
+  z-index: 1;
+  width: var(--medida);
+  margin-inline: auto;
+  padding: clamp(3rem, 7vw, 5.5rem) 0 4rem;
 }
 
 a {
   color: inherit;
-  text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+:focus-visible {
+  outline: 2px solid var(--cian);
+  outline-offset: 4px;
+}
+
+/* ---------------------------------------------------------- cabecera */
+
+.rotulo {
+  margin: 0 0 1rem;
+  font-family: var(--f-dato), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.titular {
+  margin: 0;
+  font-family: var(--f-display), Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(2.4rem, 6vw, 4.6rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.titular em {
+  font-style: italic;
+  color: var(--cian);
+}
+
+.entrada {
+  margin: 1.6rem 0 0;
+  max-width: 52ch;
+  font-size: clamp(1rem, 1.3vw, 1.12rem);
+  line-height: 1.65;
+  color: var(--tinta-suave);
+  text-wrap: pretty;
+}
+
+/* ---------------------------------------------------------- lienzo */
+
+.lienzo {
+  margin-top: clamp(2.5rem, 6vw, 4rem);
+  display: grid;
+  grid-template-columns: 1.35fr 0.65fr;
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: center;
+}
+
+.cerebro-caja {
+  position: relative;
+  aspect-ratio: 1000 / 760;
+}
+
+.sinapsis,
+.cerebro {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sinapsis {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.cerebro {
+  z-index: 1;
+  overflow: visible;
+}
+
+/* ---------------------------------------------------------- regiones */
+
+.region {
+  fill: var(--tejido);
+  stroke: var(--linea);
+  stroke-width: 1.5;
+  cursor: pointer;
+  /* Solo se anima lo que no fuerza layout. */
+  transition: fill 260ms ease, stroke 260ms ease, opacity 260ms ease,
+    filter 260ms ease;
+}
+
+.region:hover,
+.region.activa {
+  fill: var(--tejido-alto);
+}
+
+.region.atenuada {
+  opacity: 0.34;
+}
+
+.tono-coral.activa {
+  stroke: var(--coral);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 14px rgba(255, 107, 107, 0.5));
+}
+
+.tono-ambar.activa {
+  stroke: var(--ambar);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 14px rgba(255, 179, 92, 0.5));
+}
+
+.tono-cian.activa {
+  stroke: var(--cian);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 14px rgba(78, 205, 196, 0.5));
+}
+
+.tono-violeta.activa {
+  stroke: var(--violeta);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 14px rgba(167, 139, 250, 0.5));
+}
+
+.masa {
+  fill: var(--tejido);
+  stroke: var(--linea);
+  stroke-width: 2;
+}
+
+.surcos path {
+  fill: none;
+  stroke: var(--linea);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+
+/* ---------------------------------------------------------- ficha */
+
+.ficha {
+  border-left: 1px solid var(--linea);
+  padding-left: clamp(1.2rem, 3vw, 2.2rem);
+  min-height: 22rem;
+}
+
+.ficha-rotulo {
+  margin: 0 0 1rem;
+  font-family: var(--f-display), Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(1.4rem, 2.4vw, 2rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.ficha-reposo {
+  color: var(--tinta-suave);
+  font-family: var(--f-dato), ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.tono-texto-coral {
+  color: var(--coral);
+}
+.tono-texto-ambar {
+  color: var(--ambar);
+}
+.tono-texto-cian {
+  color: var(--cian);
+}
+.tono-texto-violeta {
+  color: var(--violeta);
+}
+
+.ficha-funcion {
+  margin: 0 0 1.6rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--tinta);
+}
+
+.ficha-nota {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.8rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--linea);
+}
+
+.ficha-nota p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--tinta-suave);
+}
+
+.ficha-nota-marca {
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 1px solid var(--cian);
+  border-radius: 50%;
+  color: var(--cian);
+  font-family: var(--f-display), Georgia, serif;
+  font-style: italic;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.ficha-nota-reposo .ficha-nota-marca {
+  border-color: var(--tinta-suave);
+  color: var(--tinta-suave);
+}
+
+/* ---------------------------------------------------------- pie */
+
+.pie {
+  margin-top: clamp(3rem, 7vw, 5rem);
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--linea);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 2rem;
+  justify-content: space-between;
+  font-family: var(--f-dato), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.pie a:hover {
+  color: var(--cian);
+}
+
+/* ---------------------------------------------------------- responsive */
+
+@media (max-width: 900px) {
+  .lienzo {
+    grid-template-columns: 1fr;
+  }
+
+  .ficha {
+    border-left: 0;
+    border-top: 1px solid var(--linea);
+    padding-left: 0;
+    padding-top: 1.6rem;
+    min-height: 18rem;
+  }
+}
+
+/* ---------------------------------------------------------- accesibilidad */
+
+@media (prefers-reduced-motion: reduce) {
+  .region {
+    transition-duration: 0.01ms;
   }
 }
