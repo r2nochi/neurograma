@@ -1,9 +1,9 @@
 /* =========================================================================
    Neurograma
-   Dirección: microscopía de campo oscuro. El tejido brilla sobre un índigo
-   profundo, como una preparación iluminada de lado. Varios acentos cálidos
-   —coral, ámbar, cian, violeta— en vez de un único verde ácido: cada región
-   tiene su tono y el ojo aprende a distinguirlas.
+   Dirección: pieza de museo bajo luz dirigida. Un cerebro de tejido cálido
+   sobre índigo profundo, iluminado de arriba y de lado como una preparación
+   anatómica en vitrina. Cuatro acentos —coral, ámbar, cian, violeta— en vez
+   de uno solo: cada región tiene su tono y el ojo aprende a distinguirlas.
    ========================================================================= */
 
 :root {
@@ -37,18 +37,25 @@ body {
   overflow-x: hidden;
 }
 
-/* Halo de iluminación: la luz oblicua del campo oscuro. */
+/* Luz de vitrina: el halo cálido desde arriba que sitúa la pieza en un
+   espacio en vez de flotar sobre un rectángulo negro. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(
-    ellipse 70% 55% at 50% 42%,
-    rgba(78, 205, 196, 0.07),
-    transparent 70%
-  );
+  background:
+    radial-gradient(
+      ellipse 62% 48% at 42% 44%,
+      rgba(255, 168, 132, 0.075),
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 80% 60% at 62% 70%,
+      rgba(78, 205, 196, 0.05),
+      transparent 72%
+    );
 }
 
 main {
@@ -56,7 +63,7 @@ main {
   z-index: 1;
   width: var(--medida);
   margin-inline: auto;
-  padding: clamp(3rem, 7vw, 5.5rem) 0 4rem;
+  padding: clamp(2.2rem, 4.5vw, 3.6rem) 0 4rem;
 }
 
 a {
@@ -83,7 +90,7 @@ a {
   margin: 0;
   font-family: var(--f-display), Georgia, serif;
   font-weight: 400;
-  font-size: clamp(2.4rem, 6vw, 4.6rem);
+  font-size: clamp(2.2rem, 5.2vw, 3.9rem);
   line-height: 1.02;
   letter-spacing: -0.02em;
   text-wrap: balance;
@@ -106,97 +113,168 @@ a {
 /* ---------------------------------------------------------- lienzo */
 
 .lienzo {
-  margin-top: clamp(2.5rem, 6vw, 4rem);
+  margin-top: clamp(1.4rem, 3vw, 2.2rem);
   display: grid;
-  grid-template-columns: 1.35fr 0.65fr;
-  gap: clamp(1.5rem, 4vw, 3.5rem);
-  align-items: center;
+  grid-template-columns: minmax(0, 1.34fr) minmax(0, 0.66fr);
+  grid-template-areas:
+    "escena ficha"
+    "leyenda ficha";
+  column-gap: clamp(1.4rem, 4vw, 3.4rem);
+  row-gap: clamp(1rem, 2.5vw, 1.8rem);
+  align-items: start;
 }
 
-.cerebro-caja {
+.escena {
+  grid-area: escena;
   position: relative;
-  aspect-ratio: 1000 / 760;
-}
-
-.sinapsis,
-.cerebro {
-  position: absolute;
-  inset: 0;
   width: 100%;
-  height: 100%;
+  /* 16:10 y no 5:4: con el titular delante, un lienzo mas alto empuja el
+     cerebro por debajo del pliegue y quien entra ve solo la coronilla. */
+  aspect-ratio: 16 / 10;
 }
 
-.sinapsis {
-  z-index: 2;
+/* Sombra de contacto: sin esto el cerebro flota sin peso. */
+.escena::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  width: 46%;
+  height: 5%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.55),
+    transparent 70%
+  );
   pointer-events: none;
 }
 
-.cerebro {
-  z-index: 1;
-  overflow: visible;
+.escena canvas {
+  display: block;
+  outline: none;
 }
 
-/* ---------------------------------------------------------- regiones */
-
-.region {
-  fill: var(--tejido);
-  stroke: var(--linea);
-  stroke-width: 1.5;
-  cursor: pointer;
-  /* Solo se anima lo que no fuerza layout. */
-  transition: fill 260ms ease, stroke 260ms ease, opacity 260ms ease,
-    filter 260ms ease;
-}
-
-.region:hover,
-.region.activa {
-  fill: var(--tejido-alto);
-}
-
-.region.atenuada {
-  opacity: 0.34;
-}
-
-.tono-coral.activa {
-  stroke: var(--coral);
-  stroke-width: 2.5;
-  filter: drop-shadow(0 0 14px rgba(255, 107, 107, 0.5));
-}
-
-.tono-ambar.activa {
-  stroke: var(--ambar);
-  stroke-width: 2.5;
-  filter: drop-shadow(0 0 14px rgba(255, 179, 92, 0.5));
-}
-
-.tono-cian.activa {
-  stroke: var(--cian);
-  stroke-width: 2.5;
-  filter: drop-shadow(0 0 14px rgba(78, 205, 196, 0.5));
-}
-
-.tono-violeta.activa {
-  stroke: var(--violeta);
-  stroke-width: 2.5;
-  filter: drop-shadow(0 0 14px rgba(167, 139, 250, 0.5));
-}
-
-.masa {
-  fill: var(--tejido);
-  stroke: var(--linea);
-  stroke-width: 2;
-}
-
-.surcos path {
-  fill: none;
-  stroke: var(--linea);
-  stroke-width: 1;
+.pista {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  margin: 0;
+  font-family: var(--f-dato), ui-monospace, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
   opacity: 0.55;
+  pointer-events: none;
+}
+
+.sin-lienzo {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 1rem;
+  justify-items: center;
+  text-align: center;
+  color: var(--tinta-suave);
+}
+
+.sin-lienzo span {
+  font-size: 4rem;
+  line-height: 1;
+  opacity: 0.25;
+}
+
+.sin-lienzo p {
+  margin: 0;
+  max-width: 30ch;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* ---------------------------------------------------------- leyenda */
+
+.leyenda {
+  grid-area: leyenda;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.42rem 0.85rem;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tinta-suave);
+  font-family: var(--f-dato), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  cursor: pointer;
+  /* Se mueve con transform y se pinta con color: nada aquí fuerza layout. */
+  transition: color 180ms ease, border-color 180ms ease,
+    background-color 180ms ease, transform 180ms ease;
+}
+
+.chip-marca {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+  transition: opacity 180ms ease;
+}
+
+.chip:hover,
+.chip.activa {
+  transform: translateY(-2px);
+  color: var(--tinta);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.chip.activa .chip-marca,
+.chip:hover .chip-marca {
+  opacity: 1;
+}
+
+.chip.tono-coral.activa {
+  border-color: var(--coral);
+}
+.chip.tono-coral .chip-marca {
+  background: var(--coral);
+}
+.chip.tono-ambar.activa {
+  border-color: var(--ambar);
+}
+.chip.tono-ambar .chip-marca {
+  background: var(--ambar);
+}
+.chip.tono-cian.activa {
+  border-color: var(--cian);
+}
+.chip.tono-cian .chip-marca {
+  background: var(--cian);
+}
+.chip.tono-violeta.activa {
+  border-color: var(--violeta);
+}
+.chip.tono-violeta .chip-marca {
+  background: var(--violeta);
 }
 
 /* ---------------------------------------------------------- ficha */
 
 .ficha {
+  grid-area: ficha;
   border-left: 1px solid var(--linea);
   padding-left: clamp(1.2rem, 3vw, 2.2rem);
   min-height: 22rem;
@@ -299,6 +377,16 @@ a {
 @media (max-width: 900px) {
   .lienzo {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "escena"
+      "leyenda"
+      "ficha";
+  }
+
+  .escena {
+    /* 4:3 y no cuadrado: el cerebro es casi el doble de largo que de alto,
+       así que un lienzo cuadrado son dos franjas de fondo vacío. */
+    aspect-ratio: 4 / 3;
   }
 
   .ficha {
@@ -306,14 +394,14 @@ a {
     border-top: 1px solid var(--linea);
     padding-left: 0;
     padding-top: 1.6rem;
-    min-height: 18rem;
+    min-height: 16rem;
   }
 }
 
 /* ---------------------------------------------------------- accesibilidad */
 
 @media (prefers-reduced-motion: reduce) {
-  .region {
+  .chip {
     transition-duration: 0.01ms;
   }
 }

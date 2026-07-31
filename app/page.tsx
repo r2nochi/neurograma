@@ -19,7 +19,7 @@ export default function Page() {
 
       <footer className="pie">
         <span>
-          Ilustración dibujada en SVG · sin modelos ni imágenes importadas
+          Malla generada con código · sin modelos ni imágenes importadas
         </span>
         <span>
           <a href="https://github.com/r2nochi">David Nochi</a> · Lima
