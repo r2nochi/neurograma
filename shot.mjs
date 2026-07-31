@@ -144,19 +144,21 @@ const registrar = (etiqueta, p) => {
   p.on("pageerror", (e) => errores.push(`${etiqueta}: ${e}`));
 };
 
+const MUESTRAS_FPS = 60;
 const medirFps = (p) =>
   p.evaluate(
-    () =>
+    (muestras) =>
       new Promise((res) => {
         let n = 0;
         const t0 = performance.now();
         const tic = () => {
-          if (++n >= 120)
-            return res(Math.round(120000 / (performance.now() - t0)));
+          if (++n >= muestras)
+            return res(Math.round((muestras * 1000) / (performance.now() - t0)));
           requestAnimationFrame(tic);
         };
         requestAnimationFrame(tic);
       }),
+    MUESTRAS_FPS,
   );
 
 /**
@@ -185,6 +187,22 @@ const cajaEscena = async (p) => {
 
 const rotulo = async (p) => ((await p.textContent(".ficha-rotulo")) ?? "").trim();
 
+const esperarModelo = async (p, timeout = 15000) => {
+  try {
+    await p.waitForFunction(
+      () =>
+        document.documentElement.dataset.modelo === "anatomico" ||
+        document.documentElement.dataset.modelo === "procedural-error",
+      undefined,
+      { timeout },
+    );
+  } catch {
+    // El estado exacto se reporta abajo como error; aquí evitamos ocultar el
+    // resto del diagnóstico si el asset no termina de cargar.
+  }
+  return p.evaluate(() => document.documentElement.dataset.modelo);
+};
+
 // ------------------------------------------------------- escritorio y móvil
 for (const [nombre, vp] of [
   ["esc", { width: 1440, height: 900 }],
@@ -195,7 +213,16 @@ for (const [nombre, vp] of [
 
   await p.goto(URL, { waitUntil: "networkidle" });
   await p.evaluate(() => document.fonts.ready);
-  await p.waitForTimeout(1600);
+  const modoModelo = await esperarModelo(p);
+  await p.waitForTimeout(350);
+
+  if (nombre === "esc") {
+    if (modoModelo !== "anatomico") {
+      errores.push(
+        `esc: modelo activo = ${modoModelo ?? "sin estado"}, se esperaba anatomico`,
+      );
+    }
+  }
 
   const desborde = await p.evaluate(() => ({
     hay: document.documentElement.scrollWidth > window.innerWidth + 1,
@@ -238,17 +265,17 @@ for (const [nombre, vp] of [
 
   if (nombre === "esc") {
     const fps = await medirFps(p);
-    console.log(`  fps (120 frames, GPU libre): ${fps}`);
+    console.log(`  fps (${MUESTRAS_FPS} frames, GPU libre): ${fps}`);
 
     const cdp = await p.context().newCDPSession(p);
     await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
     await p.waitForTimeout(700);
     const fpsLento = await medirFps(p);
-    console.log(`  fps (120 frames, CPU x4 mas lenta): ${fpsLento}`);
+    console.log(`  fps (${MUESTRAS_FPS} frames, CPU x4 mas lenta): ${fpsLento}`);
     await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
   } else {
     const fps = await medirFps(p);
-    console.log(`  fps movil (120 frames): ${fps}`);
+    console.log(`  fps movil (${MUESTRAS_FPS} frames): ${fps}`);
   }
 
   // ------------------------------------------ las nueve regiones responden
@@ -287,7 +314,8 @@ for (const [nombre, vp] of [
   registrar("puntero", p);
   await p.goto(URL, { waitUntil: "networkidle" });
   await p.evaluate(() => document.fonts.ready);
-  await p.waitForTimeout(1400);
+  await esperarModelo(p);
+  await p.waitForTimeout(350);
 
   const caja = await cajaEscena(p);
   const vistas = new Set();
@@ -320,7 +348,8 @@ for (const [nombre, vp] of [
   registrar("reducido", p);
   await p.goto(URL, { waitUntil: "networkidle" });
   await p.evaluate(() => document.fonts.ready);
-  await p.waitForTimeout(1600);
+  await esperarModelo(p);
+  await p.waitForTimeout(350);
   const caja = await cajaEscena(p);
 
   const e = estadisticas(
@@ -404,3 +433,4 @@ console.log(
     (avisos.length ? ` (p. ej. "${avisos[0].slice(0, 90)}...")` : ""),
 );
 await navegador.close();
+if (errores.length) process.exitCode = 1;

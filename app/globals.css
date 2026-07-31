@@ -133,6 +133,22 @@ a {
   aspect-ratio: 16 / 10;
 }
 
+.escena::before {
+  content: "";
+  position: absolute;
+  inset: 7% 10% 11%;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      ellipse at 48% 40%,
+      rgba(244, 139, 118, 0.11),
+      rgba(97, 50, 67, 0.035) 48%,
+      transparent 72%
+    );
+  filter: blur(18px);
+  pointer-events: none;
+}
+
 /* Sombra de contacto: sin esto el cerebro flota sin peso. */
 .escena::after {
   content: "";
@@ -148,10 +164,13 @@ a {
     rgba(0, 0, 0, 0.55),
     transparent 70%
   );
+  z-index: 2;
   pointer-events: none;
 }
 
 .escena canvas {
+  position: relative;
+  z-index: 1;
   display: block;
   outline: none;
 }
@@ -167,6 +186,7 @@ a {
   text-transform: uppercase;
   color: var(--tinta-suave);
   opacity: 0.55;
+  z-index: 3;
   pointer-events: none;
 }
 

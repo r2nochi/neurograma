@@ -2,6 +2,7 @@
 
 import { Canvas } from "@react-three/fiber";
 import { useEffect, useState } from "react";
+import * as THREE from "three";
 
 import { Escena, hayWebgl } from "@/components/Escena";
 import { POR_ID, REGIONES, type RegionId } from "@/lib/regiones";
@@ -59,6 +60,11 @@ export function Cerebro() {
               antialias: true,
               alpha: true,
               powerPreference: "high-performance",
+            }}
+            onCreated={({ gl: renderer }) => {
+              renderer.outputColorSpace = THREE.SRGBColorSpace;
+              renderer.toneMapping = THREE.ACESFilmicToneMapping;
+              renderer.toneMappingExposure = 1.06;
             }}
           >
             <Escena

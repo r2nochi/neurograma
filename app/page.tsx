@@ -19,7 +19,15 @@ export default function Page() {
 
       <footer className="pie">
         <span>
-          Malla generada con código · sin modelos ni imágenes importadas
+          Modelo anatómico{" "}
+          <a
+            href="https://3d.nih.gov/entries/20960/1"
+            target="_blank"
+            rel="noreferrer"
+          >
+            HRA / NIH 3D
+          </a>{" "}
+          · CC BY 4.0
         </span>
         <span>
           <a href="https://github.com/r2nochi">David Nochi</a> · Lima

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
+import { LimiteModelo } from "@/components/LimiteModelo";
+import { ModeloAnatomico } from "@/components/ModeloAnatomico";
 import { INDICE, ORDEN, regionDe, type RegionId } from "@/lib/anatomia";
 import {
   construirCerebelo,
@@ -12,96 +14,13 @@ import {
   fundir,
   type Malla,
 } from "@/lib/geometria";
+import {
+  actualizarTejido,
+  crearMaterialTejido,
+} from "@/lib/material-tejido";
 import { POR_ID, REGIONES, TONOS } from "@/lib/regiones";
 
 // --------------------------------------------------------------- shaders
-
-const VERTEX = /* glsl */ `
-  attribute float aRegion;
-  attribute float aHueco;
-
-  varying vec3 vNormal;
-  varying vec3 vVista;
-  varying float vRegion;
-  varying float vHueco;
-
-  void main() {
-    vNormal = normalize(normalMatrix * normal);
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    vVista = -mv.xyz;
-    vRegion = aRegion;
-    vHueco = aHueco;
-    gl_Position = projectionMatrix * mv;
-  }
-`;
-
-/**
- * El fragmento hace tres trabajos, y el tercero es el que importa.
- *
- * 1. Iluminar: una clave cálida arriba-izquierda y un rebote frío por debajo,
- *    para que las sombras no sean agujeros negros.
- * 2. Mojar: un especular ancho. El tejido cerebral vivo brilla.
- * 3. OCLUIR. `vHueco` trae horneado desde la CPU cuánto de fondo de surco es
- *    cada vértice. Sin ese término los pliegues existen en la geometría pero
- *    no se ven: la luz difusa no distingue una hendidura estrecha de una
- *    superficie plana, y el cerebro se lee como una piedra lisa.
- */
-const FRAGMENT = /* glsl */ `
-  precision highp float;
-
-  uniform float uActiva;   // índice de la región resaltada; -1 = ninguna
-  uniform float uMezcla;   // 0..1, cuánto pesa el resalte
-  uniform vec3 uAcento;
-  uniform vec3 uTejido;
-
-  varying vec3 vNormal;
-  varying vec3 vVista;
-  varying float vRegion;
-  varying float vHueco;
-
-  void main() {
-    vec3 N = normalize(vNormal);
-    vec3 V = normalize(vVista);
-
-    // Luces en espacio de vista: la cámara no se mueve, el cerebro sí.
-    vec3 L = normalize(vec3(-0.45, 0.68, 0.58));
-    vec3 R = normalize(vec3(0.55, -0.45, 0.20));
-
-    float dif = max(dot(N, L), 0.0);
-    float reb = max(dot(N, R), 0.0);
-    float borde = pow(1.0 - max(dot(N, V), 0.0), 2.4);
-
-    vec3 H = normalize(L + V);
-    float esp = pow(max(dot(N, H), 0.0), 26.0);
-
-    float ao = mix(0.20, 1.0, vHueco);
-
-    // Luz cálida, sombra fría. Es el truco que convierte un relieve en
-    // volumen: si luz y sombra son el mismo color, el ojo lee una mancha.
-    vec3 calido = vec3(1.06, 0.97, 0.88);
-    vec3 frio = vec3(0.52, 0.66, 1.00);
-
-    // Selección suave: en el límite entre dos regiones el atributo interpola,
-    // así que el borde se difumina medio triángulo. A esta densidad de malla
-    // eso es invisible, y evita el escalón de píxeles de un step duro.
-    float sel = 1.0 - smoothstep(0.35, 0.65, abs(vRegion - uActiva));
-    float hay = uMezcla;
-
-    vec3 tenido = mix(uTejido * 0.62, uAcento, 0.58);
-    vec3 base = mix(uTejido, tenido, sel * hay);
-    // Las regiones no elegidas se apagan a la mitad, no al 40%: por debajo de
-    // ahí el resto del cerebro desaparece y se pierde el contexto anatómico,
-    // que es justo lo que da sentido a la región resaltada.
-    base *= mix(1.0, mix(0.55, 1.0, sel), hay);
-
-    vec3 col = base * calido * (0.11 + 0.98 * dif) * ao;
-    col += base * frio * reb * 0.34 * ao;
-    col += mix(vec3(0.30, 0.38, 0.60), uAcento, sel * hay) * borde * (0.20 + 0.85 * sel * hay);
-    col += vec3(1.0) * esp * 0.20 * ao * (0.35 + 0.65 * vHueco);
-
-    gl_FragColor = vec4(col, 1.0);
-  }
-`;
 
 const ARCO_VERTEX = /* glsl */ `
   attribute float aOrigen;
@@ -167,7 +86,7 @@ function aGeometria(m: Malla) {
   g.setAttribute("position", new THREE.BufferAttribute(m.posiciones, 3));
   g.setAttribute("normal", new THREE.BufferAttribute(m.normales, 3));
   g.setAttribute("aRegion", new THREE.BufferAttribute(m.regiones, 1));
-  g.setAttribute("aHueco", new THREE.BufferAttribute(m.huecos, 1));
+  g.setAttribute("aCavidad", new THREE.BufferAttribute(m.huecos, 1));
   g.setIndex(new THREE.BufferAttribute(m.indices, 1));
   g.computeBoundingSphere();
   return g;
@@ -279,7 +198,6 @@ function construirArcos() {
 
 // --------------------------------------------------------------- escena
 
-const TEJIDO = new THREE.Color(0.82, 0.64, 0.60);
 const NEUTRO = new THREE.Color(0.42, 0.50, 0.72);
 
 type Props = {
@@ -294,7 +212,12 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
   const { camera, gl, size, invalidate } = useThree();
 
   const giro = useRef({ y: -0.22, z: 0.05, vy: 0, vz: 0, arrastrando: false });
-  const suave = useRef({ mezcla: 0, activa: -1, pulso: 0 });
+  const suave = useRef({
+    mezcla: 0,
+    activa: -1,
+    pulso: 0,
+    acento: new THREE.Color(...TONOS.cian),
+  });
   const grupoY = useRef<THREE.Group>(null);
   const grupoZ = useRef<THREE.Group>(null);
 
@@ -319,20 +242,7 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
     [],
   );
 
-  const mat = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        vertexShader: VERTEX,
-        fragmentShader: FRAGMENT,
-        uniforms: {
-          uActiva: { value: -1 },
-          uMezcla: { value: 0 },
-          uAcento: { value: new THREE.Color(...TONOS.cian) },
-          uTejido: { value: TEJIDO.clone() },
-        },
-      }),
-    [],
-  );
+  const mat = useMemo(() => crearMaterialTejido(), []);
 
   const matArcos = useMemo(
     () =>
@@ -374,16 +284,46 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
     [],
   );
 
-  // El recuento de caras se publica en el DOM para que la verificación lo LEA
-  // en vez de que yo lo calcule a mano en el README. Un número escrito a mano
-  // se queda obsoleto en cuanto alguien cambia una subdivisión.
+  const caras = useCallback(
+    (g: THREE.BufferGeometry) =>
+      (g.index?.count ?? g.getAttribute("position").count) / 3,
+    [],
+  );
+
+  const carasProcedurales = useMemo(
+    () =>
+      caras(geo.corteza) +
+      caras(geo.cerebelo) +
+      caras(geo.tronco) +
+      caras(geo.arcos),
+    [caras, geo],
+  );
+
+  // El estado y el recuento se publican en el DOM para que la verificación
+  // compruebe qué ruta se montó de verdad, no qué ruta esperábamos montar.
   useEffect(() => {
-    const caras = (g: THREE.BufferGeometry) => (g.index?.count ?? 0) / 3;
-    const dibujadas =
-      caras(geo.corteza) + caras(geo.cerebelo) + caras(geo.tronco) + caras(geo.arcos);
+    document.documentElement.dataset.modelo = "cargando";
     document.documentElement.dataset.caras =
-      `${Math.round(dibujadas)} dibujados · ${Math.round(caras(geo.proxy))} en el proxy`;
-  }, [geo]);
+      `${Math.round(carasProcedurales)} en respaldo · ${Math.round(caras(geo.proxy))} en el proxy`;
+    return () => {
+      delete document.documentElement.dataset.modelo;
+      delete document.documentElement.dataset.caras;
+    };
+  }, [caras, carasProcedurales, geo.proxy]);
+
+  const registrarModelo = useCallback(
+    (triangulos: number) => {
+      document.documentElement.dataset.caras =
+        `${triangulos} anatómicos · ${Math.round(caras(geo.arcos))} en conexiones · ${Math.round(caras(geo.proxy))} en el proxy`;
+    },
+    [caras, geo.arcos, geo.proxy],
+  );
+
+  const registrarFalloModelo = useCallback(() => {
+    document.documentElement.dataset.modelo = "procedural-error";
+    document.documentElement.dataset.caras =
+      `${Math.round(carasProcedurales)} en respaldo · ${Math.round(caras(geo.proxy))} en el proxy`;
+  }, [caras, carasProcedurales, geo.proxy]);
 
   useEffect(
     () => () => {
@@ -400,12 +340,11 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
     const cam = camera as THREE.PerspectiveCamera;
     const aspecto = size.width / Math.max(1, size.height);
     const t = Math.tan((cam.fov * Math.PI) / 360);
-    // Semiextensiones reales del modelo respecto al punto de mira: 1,12 a lo
-    // largo y 0,80 de alto. Antes ponía 0,98 de alto "por si acaso" y el
-    // cerebro quedaba nadando en un tercio de lienzo vacío.
-    const dist = Math.max(1.12 / (aspecto * t), 0.8 / t);
-    cam.position.set(dist, 0.16, 0);
-    cam.lookAt(0, -0.08, 0);
+    // El modelo médico incluye el tronco, por lo que necesita algo más de
+    // margen vertical que la antigua pieza procedural.
+    const dist = Math.max(1.12 / (aspecto * t), 1.0 / t);
+    cam.position.set(dist, 0.08, 0);
+    cam.lookAt(0, -0.03, 0);
     cam.updateProjectionMatrix();
     invalidate();
   }, [camera, size, invalidate]);
@@ -501,9 +440,8 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
     // el cerebro entero se atenuaría durante la salida.
     if (activa) {
       s.activa = INDICE[activa];
-      const acento = new THREE.Color(...TONOS[POR_ID[activa].tono]);
-      mat.uniforms.uAcento.value.copy(acento);
-      matArcos.uniforms.uAcento.value.copy(acento);
+      s.acento.setRGB(...TONOS[POR_ID[activa].tono]);
+      matArcos.uniforms.uAcento.value.copy(s.acento);
     }
     const destino = activa ? 1 : 0;
     // 0,18 s de entrada y de salida. Nada de retardo: la lección del hover
@@ -514,9 +452,12 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
 
     if (!reducido) s.pulso = (s.pulso + dt * 0.55) % 1;
 
-    mat.uniforms.uActiva.value = s.activa;
-    mat.uniforms.uMezcla.value = s.mezcla;
-    if (!activa && s.mezcla < 0.002) mat.uniforms.uTejido.value.copy(TEJIDO);
+    actualizarTejido(mat, {
+      region: s.activa,
+      mezcla: s.mezcla,
+      acento: s.acento,
+      entrada: 1,
+    });
 
     matArcos.uniforms.uActiva.value = s.activa;
     matArcos.uniforms.uMezcla.value = s.mezcla;
@@ -558,13 +499,33 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
     if (id && id !== activa) onActiva(id);
   };
 
+  const respaldo = (
+    <group scale={[1.85, 1, 1]}>
+      <mesh geometry={geo.corteza} material={mat} />
+      <mesh geometry={geo.cerebelo} material={mat} />
+      <mesh geometry={geo.tronco} material={mat} />
+    </group>
+  );
+
   return (
     <group ref={grupoZ}>
       <group ref={grupoY}>
-        <mesh geometry={geo.corteza} material={mat} />
-        <mesh geometry={geo.cerebelo} material={mat} />
-        <mesh geometry={geo.tronco} material={mat} />
-        <mesh geometry={geo.arcos} material={matArcos} renderOrder={2} />
+        <LimiteModelo fallback={respaldo} onError={registrarFalloModelo}>
+          <Suspense fallback={respaldo}>
+            <ModeloAnatomico
+              material={mat}
+              reducido={reducido}
+              onReady={registrarModelo}
+            />
+          </Suspense>
+        </LimiteModelo>
+
+        <mesh
+          geometry={geo.arcos}
+          material={matArcos}
+          renderOrder={2}
+          scale={[1.85, 1, 1]}
+        />
 
         {/* Proxy de selección: no pinta nada (colorWrite off) pero recibe el
             rayo. Separarlo de la malla visible baja el coste del hover de
@@ -573,6 +534,7 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
           geometry={geo.proxy}
           material={matProxy}
           renderOrder={-1}
+          scale={[1.85, 1, 1]}
           onPointerMove={señalar}
           onPointerOut={() => onActiva(null)}
         />
