@@ -254,6 +254,16 @@ for (const [nombre, vp] of [
   await p.screenshot({ path: `${OUT}/${nombre}-01-completa.png` });
 
   // ¿Hay un cerebro ahí? Varianza Y superficie ocupada.
+  const cuerpo = await p.screenshot({
+    path: `${OUT}/${nombre}-02-cuerpo.png`,
+    clip: await cajaEscena(p),
+  });
+  const cuerpoStats = estadisticas(cuerpo);
+  console.log(
+    `  silueta: desv ${cuerpoStats?.desv} · ${cuerpoStats?.tonos} tonos · ` +
+      `${cuerpoStats?.cuerpo}% de superficie`,
+  );
+
   const caja = await cajaEscena(p);
   const lienzo = await p.screenshot({ path: `${OUT}/${nombre}-02-cerebro.png`, clip: caja });
   const e = estadisticas(lienzo);
@@ -279,10 +289,12 @@ for (const [nombre, vp] of [
   }
 
   // ------------------------------------------ las nueve regiones responden
-  const chips = await p.$$(".chip");
+  const chips = p.locator(".chip");
+  const totalChips = await chips.count();
   const fallan = [];
-  for (const chip of chips) {
-    const nombreChip = (await chip.textContent()).trim();
+  for (let i = 0; i < totalChips; i++) {
+    const chip = chips.nth(i);
+    const nombreChip = ((await chip.textContent()) ?? "").trim();
     await chip.click();
     await p.waitForTimeout(160);
     const leido = await rotulo(p);
@@ -291,7 +303,7 @@ for (const [nombre, vp] of [
     }
   }
   console.log(
-    `  regiones que responden: ${chips.length - fallan.length}/${chips.length}` +
+    `  regiones que responden: ${totalChips - fallan.length}/${totalChips}` +
       (fallan.length ? ` — fallan: ${fallan.join(", ")}` : ""),
   );
 
@@ -391,14 +403,46 @@ for (const [nombre, vp] of [
   const hayLienzo = await p.evaluate(() => !!document.querySelector("canvas"));
   // Lo que importa del fallback: el contenido no se pierde. Las regiones
   // siguen alcanzables aunque no haya ilustración.
-  const chips = await p.$$(".chip");
-  await chips[4]?.click();
+  const chips = p.locator(".chip");
+  await chips.first().click();
   await p.waitForTimeout(150);
   const leido = await rotulo(p);
   console.log(
     `\nsin webgl: lienzo = ${hayLienzo} (debe ser false) · ` +
       `la ficha sigue respondiendo = ${leido ? `sí ("${leido}")` : "NO"}`,
   );
+  await p.close();
+}
+
+// ------------------------------------------------------ transición del modelo
+// El GLB se retrasa a propósito: durante la carga no debe aparecer la malla
+// procedural y luego desaparecer cuando llega la superficie anatómica.
+{
+  const p = await navegador.newPage({ viewport: { width: 1440, height: 900 } });
+  registrar("carga", p);
+  await p.route("**/models/neurograma-brain.glb**", async (route) => {
+    const respuesta = await route.fetch();
+    const cuerpo = await respuesta.body();
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await route.fulfill({ response: respuesta, body: cuerpo });
+  });
+  await p.goto(URL, { waitUntil: "domcontentloaded" });
+  await p.evaluate(() => document.fonts.ready);
+  await p.waitForTimeout(750);
+  const caja = await cajaEscena(p);
+  const estado = await p.evaluate(() => document.documentElement.dataset.modelo);
+  const e = estadisticas(
+    await p.screenshot({ path: `${OUT}/esc-07-carga.png`, clip: caja }),
+  );
+  const hayCerebroProvisional = !!e && e.cuerpo > 10;
+  console.log(
+    `\ncarga retrasada: estado ${estado ?? "sin estado"} · ` +
+      `${e?.cuerpo}% de superficie → ` +
+      `${hayCerebroProvisional ? "APARECE respaldo durante carga" : "sin reemplazo visual"}`,
+  );
+  if (hayCerebroProvisional) {
+    errores.push("carga: el respaldo procedural aparece mientras llega el GLB");
+  }
   await p.close();
 }
 

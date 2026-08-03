@@ -1,21 +1,53 @@
 import { Cerebro } from "@/components/Cerebro";
+import { SeccionesAtlas } from "@/components/SeccionesAtlas";
+
+const enlaces = [
+  ["Explorar", "#explorar"],
+  ["Cerebro 3D", "#atlas"],
+  ["Historias", "#historias"],
+  ["Científicos", "#cientificos"],
+  ["Investigación", "#investigacion"],
+  ["Fuentes", "#fuentes"],
+] as const;
 
 export default function Page() {
   return (
     <main>
-      <header>
-        <p className="rotulo">Neurograma · anatomía interactiva</p>
+      <a className="skip-link" href="#atlas">
+        Saltar al atlas
+      </a>
+
+      <nav className="navegacion" aria-label="Secciones de Neurograma">
+        <a className="marca" href="#explorar" aria-label="Neurograma, inicio">
+          <span className="marca-punto" aria-hidden />
+          <span>Neurograma</span>
+        </a>
+        <div className="navegacion-enlaces">
+          {enlaces.map(([label, href]) => (
+            <a href={href} key={href}>
+              {label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
+      <header id="explorar">
+        <p className="rotulo">Neurograma · anatomía cerebral interactiva</p>
         <h1 className="titular">
           Kilo y medio de tejido que <em>se pregunta</em> cómo funciona.
         </h1>
         <p className="entrada">
-          Cada región del cerebro hace algo distinto, y casi ninguna hace lo que
-          uno supondría. Recorre el mapa y descubre qué se rompe cuando se rompe
-          cada parte.
+          Explora nueve regiones del cerebro, sigue sus conexiones y descubre
+          las historias que hicieron posible dibujar lo que ocurre dentro.
         </p>
+        <a className="entrada-accion" href="#atlas">
+          Explorar el cerebro <span aria-hidden>↓</span>
+        </a>
       </header>
 
       <Cerebro />
+
+      <SeccionesAtlas />
 
       <footer className="pie">
         <span>

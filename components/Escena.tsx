@@ -208,7 +208,12 @@ type Props = {
   reducido: boolean;
 };
 
-export function Escena({ activa, onActiva, encarar, reducido }: Props) {
+export function Escena({
+  activa,
+  onActiva,
+  encarar,
+  reducido,
+}: Props) {
   const { camera, gl, size, invalidate } = useThree();
 
   const giro = useRef({ y: -0.22, z: 0.05, vy: 0, vz: 0, arrastrando: false });
@@ -220,6 +225,8 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
   });
   const grupoY = useRef<THREE.Group>(null);
   const grupoZ = useRef<THREE.Group>(null);
+  const camaraObjetivo = useRef(new THREE.Vector3(3.2, 0.16, 0));
+  const miradaObjetivo = useRef(new THREE.Vector3(0, -0.03, 0));
 
   // --- geometría: se calcula una vez, en el cliente ---------------------
   const geo = useMemo(
@@ -343,8 +350,8 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
     // El modelo médico incluye el tronco, por lo que necesita algo más de
     // margen vertical que la antigua pieza procedural.
     const dist = Math.max(1.12 / (aspecto * t), 1.0 / t);
-    cam.position.set(dist, 0.08, 0);
-    cam.lookAt(0, -0.03, 0);
+    camaraObjetivo.current.set(dist, 0.08, 0);
+    miradaObjetivo.current.set(0, -0.03, 0);
     cam.updateProjectionMatrix();
     invalidate();
   }, [camera, size, invalidate]);
@@ -408,6 +415,10 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
     const dt = Math.min(0.05, delta);
     const g = giro.current;
     const s = suave.current;
+    const pasoCamara = reducido ? 1 : 1 - Math.pow(0.0008, dt);
+
+    camera.position.lerp(camaraObjetivo.current, pasoCamara);
+    camera.lookAt(miradaObjetivo.current);
 
     // Rotación libre. Se detiene mientras hay una región abierta: quien está
     // leyendo la ficha no quiere que el sujeto se le escape de la vista.
@@ -510,36 +521,38 @@ export function Escena({ activa, onActiva, encarar, reducido }: Props) {
   return (
     <group ref={grupoZ}>
       <group ref={grupoY}>
-        <LimiteModelo fallback={respaldo} onError={registrarFalloModelo}>
-          <Suspense fallback={respaldo}>
-            <ModeloAnatomico
-              material={mat}
-              reducido={reducido}
-              onReady={registrarModelo}
-            />
-          </Suspense>
-        </LimiteModelo>
+            <Suspense fallback={null}>
+              <LimiteModelo fallback={respaldo} onError={registrarFalloModelo}>
+                <ModeloAnatomico
+                  material={mat}
+                  reducido={reducido}
+                  onReady={registrarModelo}
+                />
+              </LimiteModelo>
+            </Suspense>
 
-        <mesh
-          geometry={geo.arcos}
-          material={matArcos}
-          renderOrder={2}
-          scale={[1.85, 1, 1]}
-        />
+            <mesh
+              geometry={geo.arcos}
+              material={matArcos}
+              renderOrder={2}
+              scale={[1.85, 1, 1]}
+            />
 
         {/* Proxy de selección: no pinta nada (colorWrite off) pero recibe el
             rayo. Separarlo de la malla visible baja el coste del hover de
             20 480 pruebas de triángulo a 1 780. */}
-        <mesh
-          geometry={geo.proxy}
-          material={matProxy}
-          renderOrder={-1}
-          scale={[1.85, 1, 1]}
-          onPointerMove={señalar}
-          onPointerOut={() => onActiva(null)}
-        />
+            {
+              <mesh
+                geometry={geo.proxy}
+                material={matProxy}
+                renderOrder={-1}
+                scale={[1.85, 1, 1]}
+                onPointerMove={señalar}
+                onPointerOut={() => onActiva(null)}
+              />
+            }
+        </group>
       </group>
-    </group>
   );
 }
 
