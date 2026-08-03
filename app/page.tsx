@@ -1,14 +1,6 @@
 import { Cerebro } from "@/components/Cerebro";
 import { SeccionesAtlas } from "@/components/SeccionesAtlas";
-
-const enlaces = [
-  ["Explorar", "#explorar"],
-  ["Cerebro 3D", "#atlas"],
-  ["Historias", "#historias"],
-  ["Científicos", "#cientificos"],
-  ["Investigación", "#investigacion"],
-  ["Fuentes", "#fuentes"],
-] as const;
+import { ENLACES_NAV } from "@/lib/navegacion";
 
 export default function Page() {
   return (
@@ -23,7 +15,7 @@ export default function Page() {
           <span>Neurograma</span>
         </a>
         <div className="navegacion-enlaces">
-          {enlaces.map(([label, href]) => (
+          {ENLACES_NAV.map(([label, href]) => (
             <a href={href} key={href}>
               {label}
             </a>
